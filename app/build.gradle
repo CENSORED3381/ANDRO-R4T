@@ -1,0 +1,32 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace "com.sec.app"
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.sec.app"
+        minSdk 26
+        targetSdk 33
+        versionCode 3
+        versionName "1.2"
+
+        buildConfigField "String", "TG_TOKEN", "\"${System.getenv('TG_TOKEN') ?: 'TOKEN_FALLBACK'}\""
+        buildConfigField "String", "TG_CHAT",  "\"${System.getenv('TG_CHAT') ?: 'CHAT_FALLBACK'}\""
+    }
+    buildFeatures { buildConfig true }
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.core:core:1.12.0'
+}

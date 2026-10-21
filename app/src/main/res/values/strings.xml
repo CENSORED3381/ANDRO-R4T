@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Atualização do Sistema</string>
+    <string name="svc_notif">Serviço do sistema em execução</string>
+    <string name="shot_notif">Captura de tela</string>
+</resources>

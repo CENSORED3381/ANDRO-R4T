@@ -1,0 +1,2 @@
+-keep class com.sec.app.** { *; }
+-dontwarn org.json.**
