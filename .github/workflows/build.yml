@@ -35,7 +35,7 @@ jobs:
             SDKMANAGER="$(find /usr/local/lib/android/sdk/cmdline-tools -name sdkmanager -type f 2>/dev/null | head -n 1)"
           fi
 
-          if [ -z "$SDKMANAGER" ] || [ ! -f "$SDKMANAGER" ]; then
+          if [ ! -f "$SDKMANAGER" ]; then
             echo "ERROR: sdkmanager was not found."
             exit 1
           fi
@@ -65,42 +65,98 @@ jobs:
 
           chmod +x gradlew
 
-      - name: Diagnose Kotlin dependency conflict
+      - name: Diagnose Kotlin dependencies
+        continue-on-error: true
         run: |
-          echo "===== kotlin-stdlib-jdk8 ====="
+          mkdir -p diagnostics
 
           ./gradlew :app:dependencyInsight \
             --dependency kotlin-stdlib-jdk8 \
             --configuration debugRuntimeClasspath \
-            --no-daemon
-
-          echo "===== kotlin-stdlib ====="
+            --no-daemon \
+            --stacktrace \
+            > diagnostics/kotlin-jdk8.log 2>&1
 
           ./gradlew :app:dependencyInsight \
             --dependency kotlin-stdlib \
             --configuration debugRuntimeClasspath \
-            --no-daemon
+            --no-daemon \
+            --stacktrace \
+            > diagnostics/kotlin-stdlib.log 2>&1
 
       - name: Compile Java with detailed diagnostics
+        id: compile
+        continue-on-error: true
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT }}
         run: |
+          mkdir -p diagnostics
+
+          set +e
           ./gradlew :app:compileDebugJavaWithJavac \
             --no-daemon \
             --stacktrace \
-            --info
+            --info \
+            > diagnostics/java-compile.log 2>&1
+
+          RESULT=$?
+          set -e
+
+          echo "exit_code=$RESULT" >> "$GITHUB_OUTPUT"
+
+          echo "===== Compiler error summary ====="
+          grep -n -B 8 -A 12 -E \
+            'error:|What went wrong:|Compilation failed|Duplicate class|Could not resolve' \
+            diagnostics/java-compile.log | head -n 200 || true
+
+          exit 0
 
       - name: Build Debug APK
+        id: build_apk
+        if: steps.compile.outputs.exit_code == '0'
+        continue-on-error: true
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT }}
         run: |
-          ./gradlew assembleDebug --no-daemon
+          mkdir -p diagnostics
+
+          set +e
+          ./gradlew assembleDebug \
+            --no-daemon \
+            --stacktrace \
+            --info \
+            > diagnostics/apk-build.log 2>&1
+
+          RESULT=$?
+          set -e
+
+          echo "exit_code=$RESULT" >> "$GITHUB_OUTPUT"
+
+          tail -n 100 diagnostics/apk-build.log || true
+
+          exit 0
+
+      - name: Upload diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-diagnostics
+          path: diagnostics/
+          if-no-files-found: warn
 
       - name: Upload APK artifact
+        if: steps.build_apk.outputs.exit_code == '0'
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      - name: Mark workflow as failed if build failed
+        if: always() && (steps.compile.outputs.exit_code != '0' || (steps.compile.outputs.exit_code == '0' && steps.build_apk.outputs.exit_code != '0'))
+        run: |
+          echo "Android compilation or APK build failed."
+          echo "Download android-build-diagnostics from the workflow artifacts."
+          exit 1
