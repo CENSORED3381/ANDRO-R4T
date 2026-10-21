@@ -2,16 +2,13 @@ name: build-apk
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
       - name: Checkout repository
@@ -20,27 +17,28 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: temurin
+          java-version: '17'
 
-      - name: Set up Android SDK
+      - name: Set up Android SDK environment
         run: |
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          echo "/usr/local/lib/android/sdk/platform-tools" >> "$GITHUB_PATH"
+          echo "/usr/local/lib/android/sdk/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
 
-          if [ ! -x "$SDKMANAGER" ]; then
-            SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" \
-              -type f -name sdkmanager | sort -V | tail -n 1)"
+      - name: Accept Android SDK licenses
+        run: |
+          SDKMANAGER="/usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager"
+
+          if [ ! -f "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find /usr/local/lib/android/sdk/cmdline-tools -name sdkmanager -type f 2>/dev/null | head -n 1)"
           fi
 
-          if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
-            echo "Erro: sdkmanager não encontrado."
+          if [ -z "$SDKMANAGER" ] || [ ! -f "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager was not found."
             exit 1
           fi
-
-          echo "SDK Manager: $SDKMANAGER"
-          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
-          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
 
           yes | "$SDKMANAGER" --licenses || true
 
@@ -51,25 +49,46 @@ jobs:
       - name: Set up Gradle wrapper if missing
         run: |
           if [ ! -f gradlew ]; then
-            curl -fL -o gradle.zip \
-              https://services.gradle.org/distributions/gradle-8.5-bin.zip
+            echo "Gradle wrapper not found. Generating it..."
 
-            unzip -q gradle.zip
+            GRADLE_VERSION="8.4"
 
-            ./gradle-8.5/bin/gradle wrapper \
-              --gradle-version 8.5
+            wget -q \
+              "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+              -O /tmp/gradle.zip
+
+            unzip -q /tmp/gradle.zip -d /tmp
+
+            /tmp/gradle-${GRADLE_VERSION}/bin/gradle wrapper \
+              --gradle-version "$GRADLE_VERSION"
           fi
 
           chmod +x gradlew
 
-      - name: Build APK
+      - name: Diagnose Kotlin dependency conflict
+        run: |
+          echo "===== kotlin-stdlib-jdk8 ====="
+
+          ./gradlew :app:dependencyInsight \
+            --dependency kotlin-stdlib-jdk8 \
+            --configuration debugRuntimeClasspath \
+            --no-daemon
+
+          echo "===== kotlin-stdlib ====="
+
+          ./gradlew :app:dependencyInsight \
+            --dependency kotlin-stdlib \
+            --configuration debugRuntimeClasspath \
+            --no-daemon
+
+      - name: Build Debug APK
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT }}
         run: |
           ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
