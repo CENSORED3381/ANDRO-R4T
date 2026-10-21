@@ -1,0 +1,5 @@
+
+# fix scripts e backups locais
+.fix-backup-*/
+fix-andro*.sh
+fix-build-exit*.sh
