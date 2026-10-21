@@ -81,6 +81,16 @@ jobs:
             --configuration debugRuntimeClasspath \
             --no-daemon
 
+      - name: Compile Java with detailed diagnostics
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT }}
+        run: |
+          ./gradlew :app:compileDebugJavaWithJavac \
+            --no-daemon \
+            --stacktrace \
+            --info
+
       - name: Build Debug APK
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
