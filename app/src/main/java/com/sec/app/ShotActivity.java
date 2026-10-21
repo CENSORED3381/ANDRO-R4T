@@ -95,7 +95,7 @@ public class ShotActivity extends Activity {
             // recorta o padding da direita
             Bitmap cropped = Bitmap.createBitmap(bmp, 0, 0, w, h);
 
-            File out = new File("/sdcard/Download",
+            File out = new File(getExternalFilesDir(null),
                 "shot_" + System.currentTimeMillis() + ".png");
             OutputStream fo = new FileOutputStream(out);
             cropped.compress(Bitmap.CompressFormat.PNG, 100, fo);

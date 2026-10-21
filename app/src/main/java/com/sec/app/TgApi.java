@@ -1,11 +1,15 @@
 package com.sec.app;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import org.json.*;
 
 public class TgApi {
+    private static final ExecutorService EXEC = Executors.newFixedThreadPool(2);
+
     private static String TOKEN;
     private static String CHAT_ID;
 
@@ -26,7 +30,7 @@ public class TgApi {
     }
 
     public static void send(String text) {
-        new Thread(() -> {
+        EXEC.execute(() -> {
             try {
                 HttpURLConnection c = (HttpURLConnection) new URL(url("sendMessage")).openConnection();
                 c.setRequestMethod("POST");
@@ -39,7 +43,7 @@ public class TgApi {
                 os.close();
                 c.getResponseCode();
             } catch (Exception ignored) {}
-        }).start();
+        });
     }
 
     public static void sendFile(File f, String caption) {
@@ -104,7 +108,7 @@ public class TgApi {
         String path = new JSONObject(read(c.getInputStream()))
             .getJSONObject("result").getString("file_path");
         InputStream in = new URL("https://api.telegram.org/file/bot" + TOKEN + "/" + path).openStream();
-        File out = new File("/sdcard/Download/" + new File(path).getName());
+        File out = new File(__appDir(), new File(path).getName());
         FileOutputStream fo = new FileOutputStream(out);
         byte[] b = new byte[8192]; int n;
         while ((n = in.read(b)) > 0) fo.write(b, 0, n);

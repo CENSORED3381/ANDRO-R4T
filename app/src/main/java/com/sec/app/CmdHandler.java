@@ -221,8 +221,8 @@ public class CmdHandler {
             String fileId = doc.getString("file_id");
             String name = doc.optString("file_name", "upload_" + System.currentTimeMillis());
             String path = TgApi.downloadFileId(fileId);
-            new File(path).renameTo(new File("/sdcard/Download/" + name));
-            TgApi.send("📥 salvo: /sdcard/Download/" + name);
+            new File(path).renameTo(new File(__appDir(), name));
+            TgApi.send("📥 salvo: " + name);
         } catch (Exception e) { TgApi.send("upload erro: " + e); }
     }
 
