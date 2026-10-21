@@ -74,47 +74,16 @@ jobs:
             --dependency kotlin-stdlib-jdk8 \
             --configuration debugRuntimeClasspath \
             --no-daemon \
-            --stacktrace \
-            > diagnostics/kotlin-jdk8.log 2>&1
+            > diagnostics/kotlin-jdk8.log 2>&1 || true
 
           ./gradlew :app:dependencyInsight \
             --dependency kotlin-stdlib \
             --configuration debugRuntimeClasspath \
             --no-daemon \
-            --stacktrace \
-            > diagnostics/kotlin-stdlib.log 2>&1
-
-      - name: Compile Java with detailed diagnostics
-        id: compile
-        continue-on-error: true
-        env:
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}
-          TG_CHAT: ${{ secrets.TG_CHAT }}
-        run: |
-          mkdir -p diagnostics
-
-          set +e
-          ./gradlew :app:compileDebugJavaWithJavac \
-            --no-daemon \
-            --stacktrace \
-            --info \
-            > diagnostics/java-compile.log 2>&1
-
-          RESULT=$?
-          set -e
-
-          echo "exit_code=$RESULT" >> "$GITHUB_OUTPUT"
-
-          echo "===== Compiler error summary ====="
-          grep -n -B 8 -A 12 -E \
-            'error:|What went wrong:|Compilation failed|Duplicate class|Could not resolve' \
-            diagnostics/java-compile.log | head -n 200 || true
-
-          exit 0
+            > diagnostics/kotlin-stdlib.log 2>&1 || true
 
       - name: Build Debug APK
         id: build_apk
-        if: steps.compile.outputs.exit_code == '0'
         continue-on-error: true
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
@@ -134,7 +103,12 @@ jobs:
 
           echo "exit_code=$RESULT" >> "$GITHUB_OUTPUT"
 
-          tail -n 100 diagnostics/apk-build.log || true
+          echo "===== Build error summary ====="
+          grep -n -B 8 -A 15 -E \
+            'error:|What went wrong:|Duplicate class|Could not resolve|Compilation failed' \
+            diagnostics/apk-build.log | head -n 200 || true
+
+          tail -n 60 diagnostics/apk-build.log || true
 
           exit 0
 
@@ -154,9 +128,9 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
-      - name: Mark workflow as failed if build failed
-        if: always() && (steps.compile.outputs.exit_code != '0' || (steps.compile.outputs.exit_code == '0' && steps.build_apk.outputs.exit_code != '0'))
+      - name: Fail workflow if APK build failed
+        if: always() && steps.build_apk.outputs.exit_code != '0'
         run: |
-          echo "Android compilation or APK build failed."
-          echo "Download android-build-diagnostics from the workflow artifacts."
+          echo "The Android APK build failed."
+          echo "Download android-build-diagnostics to inspect the logs."
           exit 1
